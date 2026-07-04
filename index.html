@@ -65,7 +65,6 @@
         </footer>
     </div>
 
-    <!-- Rechtstexte Overlay Container -->
     <div id="legal-overlay" class="legal-overlay">
         <div class="legal-modal">
             <button class="close-legal-btn" onclick="closeLegal()">Close</button>
@@ -135,12 +134,11 @@
                 `;
             }
             document.getElementById('legal-overlay').style.display = 'block';
-            document.body.style.overflow = 'hidden'; // Verhindert Scrollen im Hintergrund
-        }
+            document.body.style.overflow = 'hidden';         }
 
         function closeLegal() {
             document.getElementById('legal-overlay').style.display = 'none';
-            document.body.style.overflow = ''; // Aktiviert Scrollen im Hintergrund wieder
+            document.body.style.overflow = ''; 
         }
 
         function checkReset() {
@@ -248,6 +246,7 @@
                             const hours = Math.floor(diff / (1000 * 60 * 60));
                             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                            
                             timerHtml = `
                                 <div class="timer-area" style="margin-bottom: 12px;">
                                     <div style="color: #ffbc00; font-weight: bold; margin-bottom: 8px; font-size: 0.9rem;">
@@ -296,6 +295,6 @@
             
             filterTiles();
             
-            setInterval(filterTiles, 1000);
+            setInterval(filterTiles, 60000);
         })();
     </script></body></html>
