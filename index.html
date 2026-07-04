@@ -1,0 +1,301 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NomStead Public Tile Tracker</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f13; color: #f1f1f5; padding: 20px; margin: 0; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { text-align: center; margin-bottom: 25px; }
+        h1 { color: #ffbc00; margin-bottom: 5px; font-size: 2.2rem; }
+        .filter-bar { background: #171721; border: 1px solid #262636; border-radius: 10px; padding: 15px 20px; margin-bottom: 25px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .filter-group label { font-size: 0.8rem; color: #8a8a98; font-weight: bold; text-transform: uppercase; }
+        select { background: #0f0f13; border: 1px solid #3b3b54; color: #fff; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+        .discord-btn { background: #5865F2; color: #fff; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card { background: #171721; border: 1px solid #262636; border-radius: 10px; padding: 20px; display: flex; flex-direction: column; position: relative; }
+        .card.farmed-out { opacity: 0.25; filter: grayscale(80%); }
+        .farm-checkbox-container { position: absolute; top: 20px; right: 20px; cursor: pointer; }
+        .play-btn { display: inline-block; margin-top: auto; padding: 10px 15px; background: #ffbc00; color: #000; text-align: center; text-decoration: none; font-weight: bold; border-radius: 5px; }
+        
+        /* Neue Styles für den Farmland-Timer und die grüne "Ready"-Kachel */
+        .card.ready-harvest { background: #1b4d22 !important; border-color: #2e7d32 !important; box-shadow: 0 0 10px rgba(76, 175, 80, 0.3); }
+        .ready-text { color: #81c784; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
+        .timer-area input { width: 45px; background: #0f0f13; border: 1px solid #3b3b54; color: #fff; border-radius: 4px; padding: 4px; text-align: center; }
+        .timer-area button { background: #ffbc00; border: none; color: #000; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .timer-area .btn-cancel { background: #555; color: #fff; }
+        .timer-area .btn-reset { background: #d32f2f; color: #fff; }
+
+        /* Styles für Footer und Rechtstexte Overlay */
+        footer { text-align: center; margin-top: 50px; padding: 20px; font-size: 0.85rem; color: #8a8a98; border-top: 1px solid #262636; }
+        footer a { color: #ffbc00; text-decoration: none; margin: 0 12px; cursor: pointer; }
+        footer a:hover { text-decoration: underline; }
+        .legal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 15, 19, 0.95); z-index: 9999; overflow-y: auto; padding: 40px 20px; box-sizing: border-box; }
+        .legal-modal { max-width: 800px; margin: 0 auto; background: #171721; border: 1px solid #262636; border-radius: 10px; padding: 35px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); line-height: 1.6; }
+        .legal-modal h2 { color: #ffbc00; margin-top: 0; border-bottom: 1px solid #262636; padding-bottom: 10px; }
+        .legal-modal h3 { color: #fff; margin-top: 25px; margin-bottom: 10px; }
+        .legal-modal ul { padding-left: 20px; margin: 10px 0; }
+        .close-legal-btn { position: absolute; top: 25px; right: 25px; background: #262636; color: #ffbc00; border: 1px solid #3b3b54; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .close-legal-btn:hover { background: #ffbc00; color: #000; }
+    </style>
+    <script src="forest.js"></script>
+    <script src="mountain.js"></script>
+    <script src="ponds.js"></script>
+    <script src="gf.js"></script>
+    <script src="farmland.js"></script></head><body>
+    <div class="container">
+        <header>
+            <h1>NomStead Public Tile Tracker</h1>
+            <p>Community Project</p>
+        </header>
+        <div class="filter-bar">
+            <div class="filter-group">
+                <label for="biome-filter">Filter Type</label>
+                <select id="biome-filter" onchange="filterTiles()"></select>
+            </div>
+            <div id="tile-counter">Showing: 0 Tiles</div>
+            <a href="https://discord.gg/kcsjwwbvWT" target="_blank" class="discord-btn">Submit Tile</a>
+        </div>
+        <div id="tiles-container" class="grid"></div>
+        
+        <footer>
+            <p>© 2026 NomStead Public Tile Tracker</p>
+            <a onclick="openLegal('imprint')">Legal Notice (Imprint)</a>
+            <a onclick="openLegal('privacy')">Privacy Policy</a>
+        </footer>
+    </div>
+
+    <!-- Rechtstexte Overlay Container -->
+    <div id="legal-overlay" class="legal-overlay">
+        <div class="legal-modal">
+            <button class="close-legal-btn" onclick="closeLegal()">Close</button>
+            <div id="legal-text-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const SORT_CATEGORIES = ["Public Farmland", "Public Forest", "Public Pond", "Public Mountain", "Public Gold Furnace"];
+
+        const NOMSTEAD_DATABASE = [
+            ...(typeof farmland !== 'undefined' ? farmland : []),
+            ...(typeof forest !== 'undefined' ? forest : []),
+            ...(typeof ponds !== 'undefined' ? ponds : []),
+            ...(typeof mountain !== 'undefined' ? mountain : []),
+            ...(typeof gf !== 'undefined' ? gf : [])
+        ];
+
+        
+        const LEGAL_CONFIG = {
+            operatorName: "Lars Wünsch",
+            address: "Puschkinstr. 44, 16321, Bernau",
+            country: "Germany",
+            email: "larswuensch93@gmail.com"
+        };
+
+        function openLegal(type) {
+            const contentDiv = document.getElementById('legal-text-content');
+            if (type === 'imprint') {
+                contentDiv.innerHTML = `
+                    <h2>Legal Notice (Imprint)</h2>
+                    <p>Information according to § 5 of the German Digital Services Act (DDG):</p>
+                    <h3>Website Operator & Controller</h3>
+                    <p>
+                        <strong>${LEGAL_CONFIG.operatorName}</strong><br>
+                        ${LEGAL_CONFIG.address}<br>
+                        ${LEGAL_CONFIG.country}
+                    </p>
+                    <h3>Contact Information</h3>
+                    <p>Email: ${LEGAL_CONFIG.email}</p>
+                    <h3>Dispute Resolution</h3>
+                    <p>The European Commission provides a platform for online dispute resolution (ODR): <a href="https://ec.europa.eu/consumers/odr" target="_blank" style="color: #ffbc00;">https://ec.europa.eu/consumers/odr</a>.<br>I am neither willing nor obliged to participate in dispute resolution proceedings before a consumer arbitration board.</p>
+                `;
+            } else if (type === 'privacy') {
+                contentDiv.innerHTML = `
+                    <h2>Privacy Policy</h2>
+                    <p>Last updated: July 2026</p>
+                    <p>As the operator of this website residing in Germany, I am the "controller" within the meaning of the General Data Protection Regulation (GDPR / DSGVO) regarding any automated data processing on this domain.</p>
+                    
+                    <h3>1. Controller Contact Details</h3>
+                    <p>${LEGAL_CONFIG.operatorName}, ${LEGAL_CONFIG.address}, ${LEGAL_CONFIG.country}. Email: ${LEGAL_CONFIG.email}</p>
+                    
+                    <h3>2. Hosting via GitHub Pages</h3>
+                    <p>This website is hosted by GitHub Inc., 88 Colin P Kelly Jr St, San Francisco, CA 94107, USA, utilizing their "GitHub Pages" hosting utility.</p>
+                    <p>When you request access to this website, GitHub's infrastructure automatically registers technical metadata into server log files sent by your browser. This consists of your IP address, browser build, client operating system, referrer URL, and precise timestamp. This storage is strictly mandatory due to technical web delivery operations, stability, and cyber-threat defense. The legal framework is established under Art. 6(1)(f) GDPR (Legitimate Interest). Since data processing occurs via US servers, standard contractual clauses protect data privacy compliance rules.</p>
+                    
+                    <h3>3. Web Browser LocalStorage (Strictly Necessary Content)</h3>
+                    <p>This web tool relies on your local browser engine feature called "LocalStorage" to record specific variables locally on your machine (specifically tracking active farmland countdown stamps and pond checklist flags).</p>
+                    <p>This application data remains exclusively stored on your personal device. At no point is this data synchronized, uploaded, or transmitted to me, GitHub, or any remote tracking database. The localized retention is strictly required to execute the explicit utilities requested by you (the tracker functionality).</p>
+                    <p>Pursuant to Section 25 paragraph 2 no. 2 of the German TDDDG, an intrusive cookie/consent banner overlay is not legally needed for these strictly functional operational records. The secondary handling falls within Art. 6(1)(f) GDPR (Legitimate Interest to deploy serverless stateful tools). You remain fully authorized to flush or block this storage data anytime inside your browser parameters.</p>
+                    
+                    <h3>4. Hyperlinks to External Communities (Discord)</h3>
+                    <p>This page embeds a quick launch hyperlink to the Discord social hub ecosystem. Upon executing a click event on the submission button, you navigate outside my operational perimeter. Please check Discord's individual system privacy terms to understand how they evaluate data parameters.</p>
+                    
+                    <h3>5. Your Statutory GDPR Rights</h3>
+                    <p>You have full legal entitlements toward the controller regarding your logged client data, including the Right of Access (Art. 15), Right to Erasure (Art. 17), and Right to Object (Art. 21). You also possess the statutory authority to lodge official legal complaints directly before competent Data Protection Regulatory Enforcement Agencies in the EU.</p>
+                `;
+            }
+            document.getElementById('legal-overlay').style.display = 'block';
+            document.body.style.overflow = 'hidden'; // Verhindert Scrollen im Hintergrund
+        }
+
+        function closeLegal() {
+            document.getElementById('legal-overlay').style.display = 'none';
+            document.body.style.overflow = ''; // Aktiviert Scrollen im Hintergrund wieder
+        }
+
+        function checkReset() {
+            const last = localStorage.getItem('last_farm_time');
+            const now = Date.now();
+            
+            const r = new Date(now);
+            if (r.getUTCHours() >= 12) {
+                r.setUTCHours(12, 0, 0, 0);
+            } else {
+                r.setUTCHours(0, 0, 0, 0);
+            }
+            const lastResetBoundary = r.getTime();
+
+            if (!last) { 
+                localStorage.setItem('last_farm_time', now.toString()); 
+                return; 
+            }
+
+            if (parseInt(last) < lastResetBoundary) {
+                localStorage.removeItem('farmed_tiles');
+            }
+            localStorage.setItem('last_farm_time', now.toString());
+        }
+
+        function toggleFarmStatus(link) {
+            let farmed = JSON.parse(localStorage.getItem('farmed_tiles') || '{}');
+            farmed[link] = !farmed[link];
+            localStorage.setItem('farmed_tiles', JSON.stringify(farmed));
+            filterTiles();
+        }
+
+        function startTimer(id) {
+            const hInput = document.getElementById(`h-${id}`);
+            const mInput = document.getElementById(`m-${id}`);
+            const hours = parseInt(hInput.value) || 0;
+            const minutes = parseInt(mInput.value) || 0;
+            
+            if (hours === 0 && minutes === 0) return;
+            
+            const durationMs = ((hours * 60) + minutes) * 60 * 1000;
+            const targetTimestamp = Date.now() + durationMs;
+            
+            let timers = JSON.parse(localStorage.getItem('farmland_timers') || '{}');
+            timers[id] = targetTimestamp;
+            localStorage.setItem('farmland_timers', JSON.stringify(timers));
+            filterTiles();
+        }
+
+        function clearTimer(id) {
+            let timers = JSON.parse(localStorage.getItem('farmland_timers') || '{}');
+            delete timers[id];
+            localStorage.setItem('farmland_timers', JSON.stringify(timers));
+            filterTiles();
+        }
+
+        function filterTiles() {
+            const filter = document.getElementById('biome-filter').value;
+            const farmed = JSON.parse(localStorage.getItem('farmed_tiles') || '{}');
+            const timers = JSON.parse(localStorage.getItem('farmland_timers') || '{}');
+            const now = Date.now();
+            const container = document.getElementById('tiles-container');
+            container.innerHTML = "";
+            
+            let filtered = NOMSTEAD_DATABASE.filter(t => filter === 'all' || t.filterCategory === filter);
+            document.getElementById('tile-counter').innerText = `Showing: ${filtered.length} Tiles`;
+
+            filtered.sort((a, b) => {
+                const aReady = (a.filterCategory === 'public farmland' && timers[a.id] && timers[a.id] <= now) ? 1 : 0;
+                const bReady = (b.filterCategory === 'public farmland' && timers[b.id] && timers[b.id] <= now) ? 1 : 0;
+                return bReady - aReady; 
+            });
+
+            filtered.forEach(t => {
+                const div = document.createElement('div');
+                
+                const isPond = t.filterCategory === "public pond";
+                const isFarmland = t.filterCategory === "public farmland";
+                
+                let isReady = false;
+                let timerHtml = "";
+                let checkboxHtml = "";
+
+                if (isPond) {
+                    checkboxHtml = `
+                        <div class="farm-checkbox-container" title="mark as empty">
+                            <input type="checkbox" ${farmed[t.customLink] ? 'checked' : ''} onchange="toggleFarmStatus('${t.customLink}')" title="mark as empty">
+                        </div>
+                    `;
+                }
+
+                if (isFarmland) {
+                    const targetTime = timers[t.id];
+                    if (targetTime) {
+                        const diff = targetTime - now;
+                        if (diff <= 0) {
+                            isReady = true;
+                            timerHtml = `
+                                <div class="timer-area" style="margin-bottom: 12px;">
+                                    <div class="ready-text">🌾 Ready to harvest!</div>
+                                    <button class="btn-reset" onclick="clearTimer('${t.id}')">Reset Timer</button>
+                                </div>
+                            `;
+                        } else {
+                            const hours = Math.floor(diff / (1000 * 60 * 60));
+                            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                            timerHtml = `
+                                <div class="timer-area" style="margin-bottom: 12px;">
+                                    <div style="color: #ffbc00; font-weight: bold; margin-bottom: 8px; font-size: 0.9rem;">
+                                        ⏳ ${hours}h ${minutes}m ${seconds}s left
+                                    </div>
+                                    <button class="btn-cancel" onclick="clearTimer('${t.id}')">Cancel</button>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        timerHtml = `
+                            <div class="timer-area" style="display: flex; gap: 5px; align-items: center; margin-bottom: 12px;">
+                                <input type="number" min="0" max="99" placeholder="h" id="h-${t.id}">
+                                <span style="color: #8a8a98;">:</span>
+                                <input type="number" min="0" max="59" placeholder="m" id="m-${t.id}">
+                                <button onclick="startTimer('${t.id}')">Start</button>
+                            </div>
+                        `;
+                    }
+                }
+
+                div.className = `card ${isPond && farmed[t.customLink] ? 'farmed-out' : ''} ${isReady ? 'ready-harvest' : ''}`;
+                
+                div.innerHTML = `
+                    ${checkboxHtml}
+                    <h3>${t.id}</h3>
+                    <p>Biome: <strong>${t.type}</strong></p>
+                    ${timerHtml}
+                    <a href="${t.customLink}" target="_blank" class="play-btn">Visit In-Game</a>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        (function init() {
+            checkReset();
+            NOMSTEAD_DATABASE.forEach(t => {
+                const type = t.type.toLowerCase();
+                t.filterCategory = type.includes("forest") ? "public forest" : 
+                                   type.includes("pond") ? "public pond" : 
+                                   type.includes("mountain") ? "public mountain" : 
+                                   type.includes("furnace") ? "public gold furnace" : "public farmland";
+            });
+            const drop = document.getElementById('biome-filter');
+            drop.innerHTML = '<option value="all">All Public Tiles</option>' + SORT_CATEGORIES.map(c => `<option value="${c.toLowerCase()}">${c}</option>`).join('');
+            
+            filterTiles();
+            
+            setInterval(filterTiles, 1000);
+        })();
+    </script></body></html>
